@@ -7,7 +7,6 @@ from pandas.io.json import json_normalize
 import statistics
 from scipy import stats
 import plotly.express as px
-import matplotlib.pyplot as plt
 from sklearn.cluster import DBSCAN
 from sklearn.ensemble import IsolationForest
 
