@@ -7,3 +7,4 @@ statsmodel==0.13.0
 plotly.express==0.4.1
 scikit-learn==1.0
 sklearn==0.0
+scipy==1.7.1
