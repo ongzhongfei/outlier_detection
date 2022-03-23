@@ -18,71 +18,146 @@ st.info("""
 An outlier may indicate bad data, but it does not necessarily indicate something bad has happened. 
 Anomaly detection is the process of identifying unexpected data points in data sets, which differ from the norm. 
 Traditional manual anomaly detection is humanely impossible. Thus, the aim of this web app is to 
-share insights about the different methods of detecting outlier in time series including 
-machine learning techniques by other central banks.
+share insights about the different methods of detecting outlier including machine learning techniques by other central banks.
 
 We will be using GDP data and IPI data from apikijangportal.bnm.my.
 """)
 
 # To import data from apikijangportal.bnm.gov.my (MSB 3.3: Gross Domestic Product by Expenditure Components at Constant 2010 Prices (Annual Change))
-
-df = pd.DataFrame()
-for y in range(2006,2022):
+@st.cache
+def loaddata():
+  df = pd.DataFrame()
+  for y in range(2006,2022):
     response = requests.get('https://api.bnm.gov.my/public/msb/3.3/year/'+str(y),
                             headers = {'Accept': 'application/vnd.BNM.API.v1+json'},)
     data = json.loads(response.text)
     df = df.append(pd.json_normalize(data['data']))
-df.rename(columns = {'gro_dom_pro': 'gdp_growth'}, inplace=True)
-df = df[df.period.notnull()]
-df['date'] = df.year_dt.astype('str') +'Q' + df.period.str[0]
-#df = df.drop(['period'] , axis=1)
-df.sort_values(by = 'date', inplace = True)
-df.rename(columns={'fin_com_exp_tot': 'total_consumption_expenditure',
-                    'fin_com_exp_pri_sec': 'total_consumption_expenditure_private', 
-                    'fin_com_exp_pub_sec': 'total_consumption_expenditure_public', 
-                    'gro_fix_cap_inf_tot': 'total_gross_fixed_capital_formation',
-                    'gro_fix_cap_inf_pri_sec': 'total_gross_fixed_capital_formation_private', 
-                    'gro_fix_cap_inf_pub_sec': 'total_gross_fixed_capital_formation_public', 
-                    'exp_of_goo_and_ser': 'exports_of_goods_and_services', 
-                    'imp_of_goo_and_ser': 'imports_of_goods_and_services'}, 
-                   inplace=True)
-df = df.astype({'gdp_growth':'float','total_consumption_expenditure' :'float' , 
-                'total_consumption_expenditure_private':'float',
-     'total_consumption_expenditure_public':'float', 'total_gross_fixed_capital_formation':'float', 
-     'total_gross_fixed_capital_formation_private':'float', 'total_gross_fixed_capital_formation_public':'float',
-     'exports_of_goods_and_services':'float', 'imports_of_goods_and_services':'float'})
+  df.rename(columns = {'gro_dom_pro': 'gdp_growth'}, inplace=True)
+  df = df[df.period.notnull()]
+  df['date'] = df.year_dt.astype('str') +'Q' + df.period.str[0]
+  df.sort_values(by = 'date', inplace = True)
+  df['gdp_growth'] = df['gdp_growth'].astype(float)
+  df = df[['year_dt', 'date', 'gdp_growth']]
+  df['date'] = pd.PeriodIndex(df['date'], freq="Q")
+  df.reset_index(drop = True, inplace = True)
+  return df
+
+df = loaddata()
 
 # To import data from apikijangportal.bnm.gov.my (MSB 3.5.1: Industrial Production Index (Annual Change))
+@st.cache
+def loaddata2():
+    df2 = pd.DataFrame()
+    for y in range(2016,2022):
+        response = requests.get('https://api.bnm.gov.my/public/msb/3.5.1.1/year/'+str(y),
+                                headers = {'Accept': 'application/vnd.BNM.API.v1+json'},)
+        data = json.loads(response.text)
+        df2 = df2.append(pd.json_normalize(data['data']))
+    df2['all_div'] = pd.to_numeric(df2['all_div'], errors='coerce')
+    df2['period'] = (((df2['month_dt']-1)//3)+1)
+    df2['date'] = df2.year_dt.astype('str') +'Q' + df2.period.astype('str')
+    df2.sort_values(by = 'date', inplace = True)
+    df2 = df2.astype({'all_div':'float','min' :'float' , 'ele':'float', 'man':'float', 
+                    'exp_ind_tot':'float', 'exp_ind_ele_clu_tot':'float', 'exp_ind_ele_clu_ele':'float',
+                    'exp_ind_ele_clu_ele_pro':'float', 'exp_ind_ele_clu_mac':'float', 'exp_ind_pri_clu_tot':'float',
+                    'exp_ind_pri_clu_che':'float', 'exp_ind_pri_clu_pet':'float', 'exp_ind_pri_clu_tex':'float',
+                    'exp_ind_pri_clu_woo':'float', 'exp_ind_pri_clu_rub':'float', 'exp_ind_pri_clu_off':'float',
+                    'exp_ind_pri_clu_pap':'float', 'dom_ind_tot':'float', 'dom_ind_con_clu_tot':'float',
+                    'dom_ind_con_clu_non':'float', 'dom_ind_con_clu_iro':'float', 'dom_ind_con_clu_fab':'float',
+                    'dom_ind_csm_clu_tot':'float', 'dom_ind_csm_clu_foo':'float', 'dom_ind_csm_clu_tra':'float', 
+                    'dom_ind_csm_clu_bev':'float', 'dom_ind_csm_clu_tob':'float', 'dom_ind_csm_clu_oth':'float' })
+    return df2
+df2 = loaddata2()
 
-df2 = pd.DataFrame()
-for y in range(2016,2022):
-    response = requests.get('https://api.bnm.gov.my/public/msb/3.5.1/year/'+str(y),
-                            headers = {'Accept': 'application/vnd.BNM.API.v1+json'},)
-    data = json.loads(response.text)
-    df2 = df2.append(pd.json_normalize(data['data']))
-    
-df2['all_div'] = pd.to_numeric(df2['all_div'], errors='coerce')
-df2['period'] = (((df2['month_dt']-1)//3)+1)
-df2['date'] = df2.year_dt.astype('str') +'Q' + df2.period.astype('str')
-df2.sort_values(by = 'date', inplace = True)
-
-#To find the quarterly average IPI based on the 3.5.1 data in month.
+#To find the quarterly average IPI data based on the 3.5.1 data in month.
 
 x = pd.Series(round((df2.groupby(['date'])['all_div'].mean()),1))
+x2 = pd.Series(round((df2.groupby(['date'])['min'].mean()),4))
+x3 = pd.Series(round((df2.groupby(['date'])['ele'].mean()),4))
+x4 = pd.Series(round((df2.groupby(['date'])['man'].mean()),4))
+x5 = pd.Series(round((df2.groupby(['date'])['exp_ind_tot'].mean()),1))
+x6 = pd.Series(round((df2.groupby(['date'])['exp_ind_ele_clu_tot'].mean()),4))
+x7 = pd.Series(round((df2.groupby(['date'])['exp_ind_ele_clu_ele'].mean()),4))
+x8 = pd.Series(round((df2.groupby(['date'])['exp_ind_ele_clu_ele_pro'].mean()),4))
+x9 = pd.Series(round((df2.groupby(['date'])['exp_ind_ele_clu_mac'].mean()),1))
+x10 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_tot'].mean()),4))
+x11 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_che'].mean()),4))
+x12 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_pet'].mean()),4))
+x13 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_tex'].mean()),1))
+x14 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_woo'].mean()),4))
+x15 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_rub'].mean()),4))
+x16 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_off'].mean()),4))
+x17 = pd.Series(round((df2.groupby(['date'])['exp_ind_pri_clu_pap'].mean()),1))
+x18 = pd.Series(round((df2.groupby(['date'])['dom_ind_tot'].mean()),4))
+x19 = pd.Series(round((df2.groupby(['date'])['dom_ind_con_clu_tot'].mean()),4))
+x20 = pd.Series(round((df2.groupby(['date'])['dom_ind_con_clu_non'].mean()),4))
+x21 = pd.Series(round((df2.groupby(['date'])['dom_ind_con_clu_iro'].mean()),1))
+x22 = pd.Series(round((df2.groupby(['date'])['dom_ind_con_clu_fab'].mean()),4))
+x23 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_tot'].mean()),4))
+x24 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_foo'].mean()),4))
+x25 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_tra'].mean()),1))
+x26 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_bev'].mean()),4))
+x27 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_tob'].mean()),4))
+x28 = pd.Series(round((df2.groupby(['date'])['dom_ind_csm_clu_oth'].mean()),4))
+
 xdate = list(set(df2['date']))
-ipi_df = pd.DataFrame(list(zip(xdate, x)), columns = ['date', 'all_division'])
-ipi_df['date'] = ipi_df['date'].sort_values(ascending=True).values
-ipi_df.drop(ipi_df.tail(1).index,inplace=True)
+
+@st.cache
+def loaddata3():
+    dataset = pd.DataFrame(list(zip(xdate, df['gdp_growth'], x, x2, x3, x4, x5, x6, x7, x8, x9, x10,
+                                x11, x12, x13, x14, x15, x16, x17, x18, x19, x20,
+                                x21, x22, x23, x24, x25, x26, x27, x28)), 
+                        columns = ['date', 'gdp_growth', 'all_division', 'mining', 'electricity', 'manufacturing',
+                                    'exp_ind_tot', 'exp_ind_ele_clu_tot', 'exp_ind_ele_clu_ele', 'exp_ind_ele_clu_ele_pro', 
+                                    'exp_ind_ele_clu_mac', 'exp_ind_pri_clu_tot', 'exp_ind_pri_clu_che', 'exp_ind_pri_clu_pet', 
+                                    'exp_ind_pri_clu_tex','exp_ind_pri_clu_woo', 'exp_ind_pri_clu_rub', 'exp_ind_pri_clu_off',
+                                    'exp_ind_pri_clu_pap', 'dom_ind_tot', 'dom_ind_con_clu_tot', 'dom_ind_con_clu_non', 
+                                    'dom_ind_con_clu_iro', 'dom_ind_con_clu_fab','dom_ind_csm_clu_tot', 'dom_ind_csm_clu_foo', 
+                                    'dom_ind_csm_clu_tra', 'dom_ind_csm_clu_bev', 'dom_ind_csm_clu_tob', 'dom_ind_csm_clu_oth'])
+    dataset['date'] = dataset['date'].sort_values(ascending=True).values
+    dataset.drop(dataset.tail(1).index,inplace=True)
+    return dataset
+dataset = loaddata3()
 
 if st.checkbox('Show raw data'):
-    st.subheader('GDP data')
-    st.write(df.head(n=5))
-    st.subheader('IPI data')
-    st.write(ipi_df.head(n=5))
+    st.subheader('GDP and IPI data')
+    st.write(dataset)
 
-# summary statistics for each data
-st.subheader('Summary of GDP data')
-st.table(df.describe())
+# summary statistics
+st.subheader('Summary of data')
+st.table(dataset.describe())
+with st.expander("See variables"):
+     st.write("""
+        - gdp_growth : Gross domestic product (GDP)
+        - all_division : All divisions
+        - mining : Mining
+        - electricity : Electricity
+        - manufacturing : Manufacturing
+        - exp_ind_tot : Export-oriented industries - Total
+        - exp_ind_ele_clu_tot : Export-oriented industries - Electronic and electrical cluster - Total
+        - exp_ind_ele_clu_ele : Export-oriented industries - Electronic and electrical cluster - Electronics
+        - exp_ind_ele_clu_ele_pro : Export-oriented industries - Electronic and electrical cluster - Electricals products
+        - exp_ind_ele_clu_mac : Export-oriented industries - Electronic and electrical cluster - Machineries
+        - exp_ind_pri_clu_tot : Export-oriented industries - Primary-related cluster - Total
+        - exp_ind_pri_clu_che : Export-oriented industries - Primary-related cluster - Chemicals and chemical products
+        - exp_ind_pri_clu_pet : Export-oriented industries - Primary-related cluster - Petroleum products
+        - exp_ind_pri_clu_tex : Export-oriented industries - Primary-related cluster - Textiles wearing apparel and footwear
+        - exp_ind_pri_clu_woo : Export-oriented industries - Primary-related cluster - Wood and wood products
+        - exp_ind_pri_clu_rub : Export-oriented industries - Primary-related cluster - Rubber products
+        - exp_ind_pri_clu_off : Export-oriented industries - Primary-related cluster - Off-estate processing
+        - exp_ind_pri_clu_pap : Export-oriented industries - Primary-related cluster - Paper products
+        - dom_ind_tot : Domestic-oriented industries - Total
+        - dom_ind_con_clu_tot : Domestic-oriented industries - Construction-related cluster - Total
+        - dom_ind_con_clu_non : Domestic-oriented industries - Construction-related cluster - Non-metallic mineral products
+        - dom_ind_con_clu_iro : Domestic-oriented industries - Construction-related cluster - Iron and steel
+        - dom_ind_con_clu_fab : Domestic-oriented industries - Construction-related cluster - Fabricated metal products
+        - dom_ind_csm_clu_tot : Domestic-oriented industries - Consumer-related cluster - Total
+        - dom_ind_csm_clu_foo : Domestic-oriented industries - Consumer-related cluster - Food products
+        - dom_ind_csm_clu_tra : Domestic-oriented industries - Consumer-related cluster - Transport equipment
+        - dom_ind_csm_clu_bev : Domestic-oriented industries - Consumer-related cluster - Beverages
+        - dom_ind_csm_clu_tob : Domestic-oriented industries - Consumer-related cluster - Tobacco products
+        - dom_ind_csm_clu_oth : Domestic-oriented industries - Consumer-related cluster - Others
+     """)
 
 st.subheader('1. Traditional method - Measures of Variability')
 """
@@ -92,17 +167,19 @@ st.subheader('1. Traditional method - Measures of Variability')
 """
 option = st.selectbox(
      'Choose 1 variable.',
-     ('gdp_growth', 'total_consumption_expenditure','total_consumption_expenditure_private',
-     'total_consumption_expenditure_public', 'total_gross_fixed_capital_formation', 
-     'total_gross_fixed_capital_formation_private', 'total_gross_fixed_capital_formation_public',
-     'exports_of_goods_and_services', 'imports_of_goods_and_services'
-    ))
+     ('gdp_growth', 'all_division', 'mining', 'electricity', 'manufacturing',
+        'exp_ind_tot', 'exp_ind_ele_clu_tot', 'exp_ind_ele_clu_ele', 'exp_ind_ele_clu_ele_pro', 
+        'exp_ind_ele_clu_mac', 'exp_ind_pri_clu_tot', 'exp_ind_pri_clu_che', 'exp_ind_pri_clu_pet', 
+        'exp_ind_pri_clu_tex','exp_ind_pri_clu_woo', 'exp_ind_pri_clu_rub', 'exp_ind_pri_clu_off',
+        'exp_ind_pri_clu_pap', 'dom_ind_tot', 'dom_ind_con_clu_tot', 'dom_ind_con_clu_non', 
+        'dom_ind_con_clu_iro', 'dom_ind_con_clu_fab','dom_ind_csm_clu_tot', 'dom_ind_csm_clu_foo', 
+        'dom_ind_csm_clu_tra', 'dom_ind_csm_clu_bev', 'dom_ind_csm_clu_tob', 'dom_ind_csm_clu_oth'))
      
-meddf = round((statistics.median(df[option])),4)
-meandf = round((statistics.mean(df[option])),4)
-stddf = round((statistics.stdev(df[option])),4)
-maddf = round((stats.median_absolute_deviation(df[option])),4)
-iqrdf = round((stats.iqr(df[option], rng=(25, 75))),4)
+meddf = round((statistics.median(dataset[option])),4)
+meandf = round((statistics.mean(dataset[option])),4)
+stddf = round((statistics.stdev(dataset[option])),4)
+maddf = round((stats.median_absolute_deviation(dataset[option])),4)
+iqrdf = round((stats.iqr(dataset[option], rng=(25, 75))),4)
 
 st.write('The median value                     : ', meddf)
 st.write('The mean value                       : ', meandf)
@@ -121,29 +198,25 @@ Scatter plots and box plots are the most preferred visualization tools to detect
 """
 - Scatter plot
 - Box plot
-- Histogram
 """
 option2 = st.selectbox(
      'Choose 1 variable:',
-     ('gdp_growth', 'total_consumption_expenditure','total_consumption_expenditure_private',
-     'total_consumption_expenditure_public', 'total_gross_fixed_capital_formation', 
-     'total_gross_fixed_capital_formation_private', 'total_gross_fixed_capital_formation_public',
-     'exports_of_goods_and_services', 'imports_of_goods_and_services'
-    ))
+     ('gdp_growth', 'all_division', 'mining', 'electricity', 'manufacturing',
+        'exp_ind_tot', 'exp_ind_ele_clu_tot', 'exp_ind_ele_clu_ele', 'exp_ind_ele_clu_ele_pro', 
+        'exp_ind_ele_clu_mac', 'exp_ind_pri_clu_tot', 'exp_ind_pri_clu_che', 'exp_ind_pri_clu_pet', 
+        'exp_ind_pri_clu_tex','exp_ind_pri_clu_woo', 'exp_ind_pri_clu_rub', 'exp_ind_pri_clu_off',
+        'exp_ind_pri_clu_pap', 'dom_ind_tot', 'dom_ind_con_clu_tot', 'dom_ind_con_clu_non', 
+        'dom_ind_con_clu_iro', 'dom_ind_con_clu_fab','dom_ind_csm_clu_tot', 'dom_ind_csm_clu_foo', 
+        'dom_ind_csm_clu_tra', 'dom_ind_csm_clu_bev', 'dom_ind_csm_clu_tob', 'dom_ind_csm_clu_oth'))
 
-graph1 = px.scatter(x=df['date'] , y=df[option2])
+graph1 = px.scatter(x=dataset['date'] , y=dataset[option2])
 graph1.update_layout(
         xaxis_title= "Date",
     ) 
 
-graph2 = px.box(x=df[option2])
+graph2 = px.box(x=dataset[option2])
 
-graph3 = px.histogram(x=df['date'] , y=df[option2])
-graph3.update_layout(
-        xaxis_title= "Date",
-    ) 
-
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("Scatter plot")
@@ -151,9 +224,6 @@ with col1:
 with col2:
     st.subheader("Box plot")
     st.plotly_chart(graph2 , use_container_width=True)
-with col3:
-    st.subheader("Histogram")
-    st.plotly_chart(graph3 , use_container_width=True)
 
 
 st.subheader('3. Machine learning techniques')
@@ -164,10 +234,30 @@ and classification of anomalies based on an initially large set of features. Usi
 focus on using 2 machine learning techniques.
 """)
 
-df_dbscan = df.copy()
-df_if = df.copy()
+df_dbscan = dataset.copy()
+df_if = dataset.copy()
 
 st.subheader('- Density-based spatial clustering of applications with noise (DBSCAN)​')
+st.info("""
+DBSCAN is able to find arbitrary shaped clusters and clusters with noise (i.e. outliers).
+The main idea behind DBSCAN is that a point belongs to a cluster if it is close to many points from that cluster.
+
+There are two key parameters of DBSCAN:
+- eps     : The distance that specifies the neighborhoods. Two points are considered to be neighbors if the distance between them are less than or equal to eps.
+- minPts  : Minimum number of data points to define a cluster.
+""")
+
+st.info("""
+Pros and Cons of DBSCAN
+
+Pros:
+- Does not require to specify number of clusters beforehand.
+- Performs well with arbitrary shapes clusters.
+- DBSCAN is robust to outliers and able to detect the outliers.
+
+Cons:
+- Determining an appropriate distance of neighborhood (eps) is not easy and it requires domain knowledge.
+""")
 
 col4, col5= st.columns(2)
 
@@ -178,11 +268,12 @@ with col5:
 
 
 # Separate the df from variable (datatype date format)
-df_model = df.drop(['year_dt','period', 'date'], axis=1)
+df_model = dataset.drop(['date'], axis=1)
 
 model = DBSCAN(eps = eps1, min_samples =minsample1).fit(df_model)
 colors = model.labels_
-graph4 = px.scatter(df['total_consumption_expenditure'], df['gdp_growth'], color =colors)
+color_discrete_map = {'rgb(255,0,0)', 'rgb(0,255,0)', 'rgb(0,0,255)'}
+graph4 = px.scatter(dataset['gdp_growth'], dataset['all_division'], color =colors, color_continuous_scale=["red", "green", "blue"])
 
 st.plotly_chart(graph4 , use_container_width=True)
 
@@ -191,21 +282,30 @@ df_dbscan["dbscan_outliers"] = model.fit_predict(df_model)
 st.write(df_dbscan[df_dbscan["dbscan_outliers"]==-1])
 
 st.subheader('- Isolation forest')
+st.info("""
+Isolation forests are built using decision trees. 
+
+The isolation forest needs an anomaly score to have an idea of how anomalous a data point is. 
+Its values lie between 0 and 1. The anomaly score is defined as:
+
+- A score close to 1 indicates anomalies
+- Score much smaller than 0.5 indicates normal observations
+- If all scores are close to 0.5 then the entire sample does not seem to have clearly distinct anomalies 
+
+Note: scikit-learn’s isolation forest introduced a modification of the anomaly scores. 
+The outliers are indicated by negative scores, while the positive score implies that we have normal observation.
+""")
 
 model2=IsolationForest(n_estimators=100,max_samples='auto',contamination=float(0.2)).fit(df_model)
 df_if['scores'] = model2.decision_function(df_model)
 df_if['if_outliers'] = model2.predict(df_model)
-df_if['anomaly']=df_if['if_outliers'].apply(lambda x: 'outlier' if x==-1  else 'inlier')
+df_if['anomaly']=df_if['if_outliers'].apply(lambda x: 'outlier' if x==-1  else 'normal')
 
-graph5 = px.scatter_3d(df_if,x='total_gross_fixed_capital_formation',
-                       y='total_consumption_expenditure',
-                       z='gdp_growth',
+graph5 = px.scatter_3d(df_if,x='all_division',
+                       y='mining',
+                       z='electricity',
                        color='anomaly')
 
 st.plotly_chart(graph5 , use_container_width=True)
 
 st.write(df_if[df_if['if_outliers']==-1])
-
-
-#If we filter the dataset by anomaly_label equal to -1, we can observe that all the scores are negative near zero. 
-#In the opposite case, with the anomaly label equal to 1, we found all the positive scores.
