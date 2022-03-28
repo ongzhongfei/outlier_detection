@@ -129,7 +129,7 @@ st.table(dataset.describe())
 with st.expander("See variables"):
      st.write("""
         - gdp_growth : Gross domestic product (GDP)
-        - all_division : All divisions
+        - all_division : IPI_all
         - mining : Mining
         - electricity : Electricity
         - manufacturing : Manufacturing
@@ -234,9 +234,6 @@ and classification of anomalies based on an initially large set of features. Usi
 focus on using 2 machine learning techniques.
 """)
 
-df_dbscan = dataset.copy()
-df_if = dataset.copy()
-
 st.subheader('- Density-based spatial clustering of applications with noise (DBSCAN)​')
 st.info("""
 DBSCAN is able to find arbitrary shaped clusters and clusters with noise (i.e. outliers).
@@ -262,23 +259,36 @@ Cons:
 col4, col5= st.columns(2)
 
 with col4:
-    eps1 = st.slider('Choose the eps value:', min_value = 5, max_value= 50, value= 5, step=1 )
+    eps1 = st.slider('Choose the eps value:', min_value = 1, max_value= 30, value= 3, step=1 )
 with col5:
     minsample1 = st.slider('Choose the min sample:', min_value = 3, max_value= 10, value= 3 )
 
 
 # Separate the df from variable (datatype date format)
-df_model = dataset.drop(['date'], axis=1)
+option3 = st.multiselect(
+     'Choose variables detect outlier:',
+     ['gdp_growth', 'all_division', 'mining', 'electricity', 'manufacturing',
+        'exp_ind_tot', 'exp_ind_ele_clu_tot', 'exp_ind_ele_clu_ele', 'exp_ind_ele_clu_ele_pro', 
+        'exp_ind_ele_clu_mac', 'exp_ind_pri_clu_tot', 'exp_ind_pri_clu_che', 'exp_ind_pri_clu_pet', 
+        'exp_ind_pri_clu_tex','exp_ind_pri_clu_woo', 'exp_ind_pri_clu_rub', 'exp_ind_pri_clu_off',
+        'exp_ind_pri_clu_pap', 'dom_ind_tot', 'dom_ind_con_clu_tot', 'dom_ind_con_clu_non', 
+        'dom_ind_con_clu_iro', 'dom_ind_con_clu_fab','dom_ind_csm_clu_tot', 'dom_ind_csm_clu_foo', 
+        'dom_ind_csm_clu_tra', 'dom_ind_csm_clu_bev', 'dom_ind_csm_clu_tob', 'dom_ind_csm_clu_oth'],
+     default = ['gdp_growth' , 'all_division', 'electricity'])
 
-model = DBSCAN(eps = eps1, min_samples =minsample1).fit(df_model)
+#df_model = dataset.drop(['date'], axis=1)
+df_dbscan = dataset.copy()
+df_if = dataset.copy()
+
+model = DBSCAN(eps = eps1, min_samples =minsample1).fit(dataset[option3])
 colors = model.labels_
-color_discrete_map = {'rgb(255,0,0)', 'rgb(0,255,0)', 'rgb(0,0,255)'}
-graph4 = px.scatter(dataset['gdp_growth'], dataset['all_division'], color =colors, color_continuous_scale=["red", "green", "blue"])
+df_dbscan["dbscan_outliers"] = model.fit_predict(dataset[option3])
+df_dbscan['anomaly']= df_dbscan['dbscan_outliers'].apply(lambda x: 'outlier' if x==-1  else 'normal')
+graph4 = px.scatter(dataset['gdp_growth'], dataset['all_division'], color =df_dbscan['anomaly'])
 
 st.plotly_chart(graph4 , use_container_width=True)
 
-df_dbscan["dbscan_outliers"] = model.fit_predict(df_model)
-
+st.write('Below are the identified outliers:')
 st.write(df_dbscan[df_dbscan["dbscan_outliers"]==-1])
 
 st.subheader('- Isolation forest')
@@ -296,16 +306,16 @@ Note: scikit-learn’s isolation forest introduced a modification of the anomaly
 The outliers are indicated by negative scores, while the positive score implies that we have normal observation.
 """)
 
-model2=IsolationForest(n_estimators=100,max_samples='auto',contamination=float(0.2)).fit(df_model)
-df_if['scores'] = model2.decision_function(df_model)
-df_if['if_outliers'] = model2.predict(df_model)
+model2=IsolationForest(n_estimators=100,max_samples='auto',contamination=float(0.2)).fit(dataset[option3])
+df_if['scores'] = model2.decision_function(dataset[option3])
+df_if['if_outliers'] = model2.predict(dataset[option3])
 df_if['anomaly']=df_if['if_outliers'].apply(lambda x: 'outlier' if x==-1  else 'normal')
 
 graph5 = px.scatter_3d(df_if,x='all_division',
-                       y='mining',
+                       y='gdp_growth',
                        z='electricity',
                        color='anomaly')
 
 st.plotly_chart(graph5 , use_container_width=True)
-
+st.write('Below are the identified outliers:')
 st.write(df_if[df_if['if_outliers']==-1])
