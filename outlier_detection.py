@@ -25,9 +25,17 @@ An outlier may indicate bad data, but it does not necessarily indicate something
 Anomaly detection is the process of identifying unexpected data points in data sets, which differ from the norm. 
 Traditional manual anomaly detection is humanely impossible. Thus, the aim of this web app is to 
 share insights about the different methods of detecting outlier including machine learning techniques by other central banks.
-
 We will be using GDP data and IPI data from apikijangportal.bnm.my.
 """)
+
+#To upload data in CSV format
+uploaded_file = st.file_uploader("Upload data in CSV format", type=".csv")
+
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+
+    st.markdown("### Data preview")
+    st.dataframe(df.head())
 
 # To import data from apikijangportal.bnm.gov.my (MSB 3.3: Gross Domestic Product by Expenditure Components at Constant 2010 Prices (Annual Change))
 @st.cache
@@ -176,9 +184,9 @@ with st.expander("See variables"):
 
 st.subheader('1. Traditional method - Measures of Variability')
 """
-- Standard deviation
-- Median absolute deviation
-- Interquartile range
+- Standard deviation (SD)
+- Median absolute deviation (MAD)
+- Interquartile range (IQR)
 """
 option = st.selectbox(
      'Choose 1 variable.',
@@ -206,7 +214,6 @@ st.subheader('2. Graphing your data to identify outliers')
 st.info("""
 The simplest way to detect an outlier is by graphing the features or the data points. 
 Visualization is one of the best and easiest ways to have an inference about the overall data and the outliers.
-
 Scatter plots and box plots are the most preferred visualization tools to detect outliers.
 """)
 
@@ -278,6 +285,31 @@ with col2:
     st.subheader(data_name_dict[option2] + " trend")
     st.plotly_chart(graph2 , use_container_width=True)
 
+st.subheader('Find Potential Outliers using SD, MAD & IQR')
+st.write('Define the distance factor α. Setting α=3 for Mean/SD method covers 99% of the distribution assuming the data is normally distributed.')
+st.write('Note that alpha is irrelevant when choosing IQR.')
+
+graph3 = px.histogram(dataset, x=dataset['datetime'], y=dataset[option2])
+
+col3, col4 = st.columns([1,3])
+
+with col3:
+    option = st.selectbox(
+     'Data Transformation',
+     ('Log', 'Box-cox'))
+    numalpha = st.number_input('Choose Alpha', min_value=1, step=1)
+    method = st.radio(
+     "Choose Measure of Variability",
+     ('Mean/SD', 'Median/MAD', 'IQR'))
+
+#if method == 'Mean/SD':
+     #st.write('You selected comedy.')
+ #else:
+     #st.write("You didn't select comedy.")
+
+with col4:
+    st.write('Histogram with Outlier Threshold')
+    st.plotly_chart(graph3 , use_container_width=True)
 
 st.subheader('3. Machine learning techniques')
 st.info("""
@@ -306,7 +338,6 @@ st.subheader('3.1 Density-based spatial clustering of applications with noise (D
 st.info("""
 DBSCAN is able to find arbitrary shaped clusters and clusters with noise (i.e. outliers).
 The main idea behind DBSCAN is that a point belongs to a cluster if it is close to many points from that cluster.
-
 There are two key parameters of DBSCAN:
 - eps     : The distance that specifies the neighborhoods. Two points are considered to be neighbors if the distance between them are less than or equal to eps.
 - minPts  : Minimum number of data points to define a cluster.
@@ -314,12 +345,10 @@ There are two key parameters of DBSCAN:
 
 st.info("""
 Pros and Cons of DBSCAN
-
 Pros:
 - Does not require to specify number of clusters beforehand.
 - Performs well with arbitrary shapes clusters.
 - DBSCAN is robust to outliers and able to detect the outliers.
-
 Cons:
 - Determining an appropriate distance of neighborhood (eps) is not easy and it requires domain knowledge.
 """)
@@ -450,7 +479,6 @@ st.write(df_dbscan[df_dbscan["dbscan_outliers"]=="Noise"])
 st.subheader('3.2 Isolation forest')
 st.info("""
 Isolation forests are built using decision trees. 
-
 This exercise uses isolation forest from the scikit learn package. 
 The outliers are indicated by negative scores, while the positive score implies that we have normal observation.
 """)
@@ -500,4 +528,3 @@ else:
 st.plotly_chart(graph5 , use_container_width=True)
 st.write('Below are the identified outliers:')
 st.write(df_if[df_if['if_outliers']==-1])
-
